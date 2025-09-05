@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ludo Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* CSS Variables for easy customization */
+        :root {
+            --board-size: min(90vw, 85vh);
+            --cell-size: calc(var(--board-size) / 15);
+            --pawn-size: calc(var(--cell-size) * 0.7);
+            --dot-size: calc(var(--pawn-size) * 0.25);
+            --c-red: #ef4444;
+            --c-green: #22c55e;
+            --c-yellow: #f59e0b;
+            --c-blue: #3b82f6;
+        }
+
+        /* Basic Body and Layout Styling */
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #1a202c;
+            color: white;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 1rem;
+        }
+
+        /* Game Container */
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2rem;
+        }
+
+        @media (min-width: 1024px) {
+            #game-container {
+                flex-direction: row;
+            }
+        }
+
+        /* Ludo Board Styling */
+        .board {
+            width: var(--board-size);
+            height: var(--board-size);
+            display: grid;
+            grid-template-columns: repeat(15, 1fr);
+            grid-template-rows: repeat(15, 1fr);
+            border: 4px solid #4a5568;
+            position: relative;
+        }
+
+        .cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            box-shadow: inset 0 0 0 1px #4a5568;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Base Area Styling */
+        .base {
+            grid-area: span 6 / span 6;
+            padding: calc(var(--cell-size) * 0.5);
+            position: relative;
+        }
+
+        .base-inner {
+            width: 100%;
+            height: 100%;
+            border-radius: 0.5rem;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: calc(var(--cell-size) * 0.5);
+            padding: calc(var(--cell-size) * 0.5);
+            border: 2px solid rgba(255,255,255,0.5);
+        }
+
+        .pawn-spot {
+            background-color: #2d3748;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        /* Base Colors */
+        .red-base { grid-area: 1 / 1 / span 6 / span 6; background-color: var(--c-red); }
+        .green-base { grid-area: 1 / 10 / span 6 / span 6; background-color: var(--c-green); }
+        .yellow-base { grid-area: 10 / 10 / span 6 / span 6; background-color: var(--c-yellow); }
+        .blue-base { grid-area: 10 / 1 / span 6 / span 6; background-color: var(--c-blue); }
+
+        /* Path Colors */
+        .red-path { background-color: var(--c-red); }
+        .green-path { background-color: var(--c-green); }
+        .yellow-path { background-color: var(--c-yellow); }
+        .blue-path { background-color: var(--c-blue); }
+        
+        /* Safe Spot Star */
+        .safe-spot::after {
+            content: '★';
+            font-size: calc(var(--cell-size) * 0.6);
+            color: rgba(255, 255, 255, 0.5);
+            position: absolute;
+        }
+
+        /* Center Triangle Area */
+        .center-triangle-container {
+            grid-area: 7 / 7 / span 3 / span 3;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+        }
+        .triangle { width: 0; height: 0; }
+        .red-triangle { border-bottom: calc(var(--cell-size) * 1.5) solid var(--c-red); border-left: calc(var(--cell-size) * 1.5) solid transparent; border-right: calc(var(--cell-size) * 1.5) solid transparent; }
+        .green-triangle { border-left: calc(var(--cell-size) * 1.5) solid var(--c-green); border-top: calc(var(--cell-size) * 1.5) solid transparent; border-bottom: calc(var(--cell-size) * 1.5) solid transparent; }
+        .yellow-triangle { border-top: calc(var(--cell-size) * 1.5) solid var(--c-yellow); border-left: calc(var(--cell-size) * 1.5) solid transparent; border-right: calc(var(--cell-size) * 1.5) solid transparent; }
+        .blue-triangle { border-right: calc(var(--cell-size) * 1.5) solid var(--c-blue); border-top: calc(var(--cell-size) * 1.5) solid transparent; border-bottom: calc(var(--cell-size) * 1.5) solid transparent; }
+
+        /* Pawn Styling */
+        .pawn {
+            width: var(--pawn-size);
+            height: var(--pawn-size);
+            border-radius: 50%;
+            position: absolute;
+            border: 2px solid rgba(0,0,0,0.5);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            z-index: 10;
+        }
+        .pawn.movable {
+            animation: bounce 1s infinite;
+            border-color: white;
+            box-shadow: 0 0 15px white;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        /* Pawn Colors */
+        .red-pawn { background-color: var(--c-red); }
+        .green-pawn { background-color: var(--c-green); }
+        .yellow-pawn { background-color: var(--c-yellow); }
+        .blue-pawn { background-color: var(--c-blue); }
+        
+        /* Dice Container and 3D Effect */
+        .dice-container {
+            width: calc(var(--cell-size) * 2);
+            height: calc(var(--cell-size) * 2);
+            perspective: 1000px;
+        }
+        .dice {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 1s;
+        }
+        .face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: #fff;
+            border: 2px solid #4a5568;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            box-sizing: border-box;
+            flex-wrap: wrap;
+        }
+        .dot {
+            width: var(--dot-size);
+            height: var(--dot-size);
+            background: #1a202c;
+            border-radius: 50%;
+            margin: calc(var(--dot-size) * 0.25);
+        }
+        /* Dice face transforms */
+        .front  { transform: translateZ(calc(var(--cell-size))); }
+        .back   { transform: rotateY(180deg) translateZ(calc(var(--cell-size))); }
+        .right  { transform: rotateY(90deg) translateZ(calc(var(--cell-size))); }
+        .left   { transform: rotateY(-90deg) translateZ(calc(var(--cell-size))); }
+        .top    { transform: rotateX(90deg) translateZ(calc(var(--cell-size))); }
+        .bottom { transform: rotateX(-90deg) translateZ(calc(var(--cell-size))); }
+
+        /* Dot arrangements */
+        .face-1 { justify-content: center; align-items: center; }
+        .face-2 { justify-content: space-between; }
+        .face-2 .dot:nth-child(2) { align-self: flex-end; }
+        .face-3 { justify-content: space-between; }
+        .face-3 .dot:nth-child(2) { align-self: center; }
+        .face-3 .dot:nth-child(3) { align-self: flex-end; }
+        .face-4 { flex-direction: column; justify-content: space-between; }
+        .face-4 > div { display: flex; justify-content: space-between; width: 100%; }
+        .face-5 { display: grid; grid-template-areas: "a . c" ". e ." "d . b"; }
+        .face-5 .dot:nth-child(1) { grid-area: a; }
+        .face-5 .dot:nth-child(2) { grid-area: b; }
+        .face-5 .dot:nth-child(3) { grid-area: c; }
+        .face-5 .dot:nth-child(4) { grid-area: d; }
+        .face-5 .dot:nth-child(5) { grid-area: e; }
+        .face-6 { flex-direction: column; justify-content: space-between; }
+        .face-6 > div { display: flex; justify-content: space-between; width: 100%; }
+
+        /* Game Overlay and Winner Card */
+        #game-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .winner-card {
+            background-color: #2d3748;
+            padding: 2rem 4rem;
+            border-radius: 1rem;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="ludo-board" class="board">
+            </div>
+
+        <div id="controls" class="flex flex-col items-center gap-6">
+            <h1 class="text-4xl font-bold tracking-wider">LUDO KING</h1>
+            <div id="player-turn" class="text-2xl font-semibold p-3 rounded-lg transition-all duration-300">
+                Red's Turn
+            </div>
+            <div class="dice-container" onclick="rollDice()">
+                <div id="dice" class="dice">
+                    </div>
+            </div>
+            <button id="roll-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-full text-xl shadow-lg transform hover:scale-105 transition-transform duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                Roll Dice
+            </button>
+            <p id="message" class="text-lg text-gray-400 h-8"></p>
+        </div>
+    </div>
+    
+    <div id="game-overlay" class="hidden">
+        <div class="winner-card">
+            <h2 class="text-4xl font-bold mb-2">Congratulations!</h2>
+            <p id="winner-text" class="text-2xl mb-6"></p>
+            <button id="restart-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-6 rounded-lg">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const board = document.getElementById('ludo-board');
+            const diceElement = document.getElementById('dice');
+            const rollBtn = document.getElementById('roll-btn');
+            const playerTurnElement = document.getElementById('player-turn');
+            const messageElement = document.getElementById('message');
+            const gameOverlay = document.getElementById('game-overlay');
+            const winnerText = document.getElementById('winner-text');
+            const restartBtn = document.getElementById('restart-btn');
+
+            const players = {
+                red: { name: 'Red', color: 'var(--c-red)' },
+                green: { name: 'Green', color: 'var(--c-green)' },
+                yellow: { name: 'Yellow', color: 'var(--c-yellow)' },
+                blue: { name: 'Blue', color: 'var(--c-blue)' }
+            };
+
+            const playerOrder = ['red', 'green', 'yellow', 'blue'];
+            let currentPlayerIndex = 0;
+            let diceValue = 0;
+            let pawns = {};
+            let isRolling = false;
+
+            // Path definitions for each player. This is the main game logic.
+            // The paths are in a [row, col] format.
+            const paths = {
+                red: [
+                    [8, 2], [7, 2], [7, 3], [7, 4], [7, 5], [7, 6], [6, 7], [5, 7], [4, 7], [3, 7], [2, 7],
+                    [2, 8], [2, 9], [3, 9], [4, 9], [5, 9], [6, 9], [7, 10], [7, 11], [7, 12], [7, 13], [7, 14],
+                    [8, 15], [9, 15], [9, 14], [9, 13], [9, 12], [9, 11], [9, 10], [10, 9], [11, 9], [12, 9],
+                    [13, 9], [14, 9], [15, 9], [15, 8], [15, 7], [14, 7], [13, 7], [12, 7], [11, 7], [10, 7],
+                    [9, 6], [9, 5], [9, 4], [9, 3], [9, 2], [8, 1],
+                    [8, 2], [8, 3], [8, 4], [8, 5], [8, 6], [8, 7] // Home path
+                ],
+                green: [
+                    [2, 8], [2, 9], [3, 9], [4, 9], [5, 9], [6, 9], [7, 10], [7, 11], [7, 12], [7, 13], [7, 14],
+                    [8, 15], [9, 15], [9, 14], [9, 13], [9, 12], [9, 11], [9, 10], [10, 9], [11, 9], [12, 9],
+                    [13, 9], [14, 9], [15, 9], [15, 8], [15, 7], [14, 7], [13, 7], [12, 7], [11, 7], [10, 7],
+                    [9, 6], [9, 5], [9, 4], [9, 3], [9, 2], [8, 1], [7, 1], [7, 2], [7, 3], [7, 4], [7, 5],
+                    [7, 6], [6, 7], [5, 7], [4, 7], [3, 7], [2, 7],
+                    [2, 8], [3, 8], [4, 8], [5, 8], [6, 8], [7, 8] // Home path
+                ],
+                yellow: [
+                    [8, 14], [9, 14], [9, 13], [9, 12], [9, 11], [9, 10], [10, 9], [11, 9], [12, 9], [13, 9],
+                    [14, 9], [15, 9], [15, 8], [15, 7], [14, 7], [13, 7], [12, 7], [11, 7], [10, 7], [9, 6],
+                    [9, 5], [9, 4], [9, 3], [9, 2], [8, 1], [7, 1], [7, 2], [7, 3], [7, 4], [7, 5], [7, 6],
+                    [6, 7], [5, 7], [4, 7], [3, 7], [2, 7], [1, 8], [2, 8], [2, 9], [3, 9], [4, 9], [5, 9],
+                    [6, 9], [7, 10], [7, 11], [7, 12], [7, 13], [7, 14],
+                    [8, 14], [8, 13], [8, 12], [8, 11], [8, 10], [8, 9] // Home path
+                ],
+                blue: [
+                    [14, 8], [15, 8], [15, 7], [14, 7], [13, 7], [12, 7], [11, 7], [10, 7], [9, 6], [9, 5],
+                    [9, 4], [9, 3], [9, 2], [8, 1], [7, 1], [7, 2], [7, 3], [7, 4], [7, 5], [7, 6], [6, 7],
+                    [5, 7], [4, 7], [3, 7], [2, 7], [1, 8], [2, 8], [2, 9], [3, 9], [4, 9], [5, 9], [6, 9],
+                    [7, 10], [7, 11], [7, 12], [7, 13], [7, 14], [8, 15], [9, 15], [9, 14], [9, 13], [9, 12],
+                    [9, 11], [9, 10], [10, 9], [11, 9], [12, 9], [13, 9], [14, 9], [15, 9],
+                    [14, 8], [13, 8], [12, 8], [11, 8], [10, 8], [9, 8] // Home path
+                ]
+            };
+            
+            const startPositions = {
+                red: 51, green: 51, yellow: 51, blue: 51
+            };
+            
+            const safeSpots = ['2-7', '7-2', '2-9', '9-2', '7-14', '14-7', '9-14', '14-9'];
+
+            function createBoard() {
+                board.innerHTML = '';
+                
+                // Create all 15x15 cells
+                for (let r = 1; r <= 15; r++) {
+                    for (let c = 1; c <= 15; c++) {
+                        const cell = document.createElement('div');
+                        cell.classList.add('cell');
+                        cell.id = `cell-${r}-${c}`;
+                        cell.style.gridRow = r;
+                        cell.style.gridColumn = c;
+                        board.appendChild(cell);
+                    }
+                }
+                
+                // Create bases and center
+                const areas = [
+                    { name: 'red-base', class: 'red-base', area: '1/1/span 6/span 6' },
+                    { name: 'green-base', class: 'green-base', area: '1/10/span 6/span 6' },
+                    { name: 'yellow-base', class: 'yellow-base', area: '10/10/span 6/span 6' },
+                    { name: 'blue-base', class: 'blue-base', area: '10/1/span 6/span 6' },
+                    { name: 'center', class: 'center-triangle-container', area: '7/7/span 3/span 3' }
+                ];
+                
+                areas.forEach(a => {
+                    const el = document.createElement('div');
+                    if(a.name.includes('base')) el.classList.add('base');
+                    el.classList.add(a.class);
+                    el.style.gridArea = a.area;
+                    if(a.name.includes('base')){
+                       const inner = document.createElement('div');
+                       inner.classList.add('base-inner');
+                       for(let i=0; i<4; i++){
+                           const spot = document.createElement('div');
+                           spot.classList.add('pawn-spot');
+                           spot.id = `${a.name.split('-')[0]}-spot-${i}`;
+                           inner.appendChild(spot);
+                       }
+                       el.appendChild(inner);
+                    } else { // Center triangle
+                        const redT = document.createElement('div'); redT.classList.add('triangle', 'red-triangle');
+                        const greenT = document.createElement('div'); greenT.classList.add('triangle', 'green-triangle');
+                        const yellowT = document.createElement('div'); yellowT.classList.add('triangle', 'yellow-triangle');
+                        const blueT = document.createElement('div'); blueT.classList.add('triangle', 'blue-triangle');
+                        el.appendChild(redT); el.appendChild(greenT); el.appendChild(yellowT); el.appendChild(blueT);
+                    }
+                    board.appendChild(el);
+                });
+
+                // Color the paths
+                for(let i = 1; i <= 6; i++) {
+                    document.getElementById(`cell-8-${i+1}`).classList.add('red-path');
+                    document.getElementById(`cell-${i+1}-8`).classList.add('green-path');
+                    document.getElementById(`cell-8-${15-i}`).classList.add('yellow-path');
+                    document.getElementById(`cell-${15-i}-8`).classList.add('blue-path');
+                }
+
+                // Color start cells and safe spots
+                document.getElementById('cell-8-2').classList.add('red-path');
+                document.getElementById('cell-2-8').classList.add('green-path');
+                document.getElementById('cell-8-14').classList.add('yellow-path');
+                document.getElementById('cell-14-8').classList.add('blue-path');
+                
+                // Add safe spot icons
+                safeSpots.forEach(id => document.getElementById(`cell-${id}`).classList.add('safe-spot'));
+
+                // Create Dice Faces
+                const diceFaces = [
+                    { transform: 'rotateY(0deg)', dots: 1 },
+                    { transform: 'rotateX(-90deg)', dots: 2 },
+                    { transform: 'rotateY(90deg)', dots: 3 },
+                    { transform: 'rotateY(-90deg)', dots: 4 },
+                    { transform: 'rotateX(90deg)', dots: 5 },
+                    { transform: 'rotateY(180deg)', dots: 6 },
+                ];
+                
+                diceFaces.forEach((faceInfo) => {
+                    const face = document.createElement('div');
+                    face.classList.add('face', `face-${faceInfo.dots}`);
+                    face.style.transform = `${faceInfo.transform} translateZ(calc(var(--cell-size)))`;
+
+                    // Generate dots based on face number
+                    if (faceInfo.dots === 4 || faceInfo.dots === 6) {
+                        const col1 = document.createElement('div');
+                        const col2 = document.createElement('div');
+                        for(let j=0; j < faceInfo.dots / 2; j++) col1.appendChild(document.createElement('div'));
+                        for(let j=0; j < faceInfo.dots / 2; j++) col2.appendChild(document.createElement('div'));
+                        [...col1.children, ...col2.children].forEach(d => d.classList.add('dot'));
+                        face.appendChild(col1);
+                        face.appendChild(col2);
+                    } else if (faceInfo.dots === 5){
+                        for(let j=0; j < 5; j++) face.appendChild(document.createElement('div'));
+                        [...face.children].forEach(d => d.classList.add('dot'));
+                    } else {
+                        for(let j=0; j < faceInfo.dots; j++) face.appendChild(document.createElement('div'));
+                        [...face.children].forEach(d => d.classList.add('dot'));
+                    }
+                    diceElement.appendChild(face);
+                });
+            }
+
+            function initializePawns() {
+                pawns = {};
+                playerOrder.forEach(color => {
+                    pawns[color] = [];
+                    for (let i = 0; i < 4; i++) {
+                        pawns[color].push({
+                            id: `${color}-pawn-${i}`,
+                            position: -1, // -1 means in base
+                            state: 'base', // base, active, home
+                            element: createPawnElement(color, i)
+                        });
+                    }
+                });
+                renderPawns();
+            }
+
+            function createPawnElement(color, index) {
+                const pawnEl = document.createElement('div');
+                pawnEl.classList.add('pawn', `${color}-pawn`);
+                pawnEl.id = `${color}-pawn-${index}`;
+                pawnEl.addEventListener('click', () => handlePawnClick(color, index));
+                board.appendChild(pawnEl);
+                return pawnEl;
+            }
+            
+            function renderPawns() {
+                // This function positions the pawns on the board based on their state and position
+                playerOrder.forEach(color => {
+                    pawns[color].forEach(pawn => {
+                        if (pawn.state === 'base') {
+                            const spot = document.getElementById(`${color}-spot-${pawn.id.split('-')[2]}`);
+                            if (spot) {
+                                const rect = spot.getBoundingClientRect();
+                                const boardRect = board.getBoundingClientRect();
+                                pawn.element.style.left = `${rect.left - boardRect.left + (rect.width / 2) - (pawn.element.offsetWidth / 2)}px`;
+                                pawn.element.style.top = `${rect.top - boardRect.top + (rect.height / 2) - (pawn.element.offsetHeight / 2)}px`;
+                            }
+                        } else if (pawn.state === 'active' || pawn.state === 'home') {
+                            const [row, col] = paths[color][pawn.position];
+                            const cell = document.getElementById(`cell-${row}-${col}`);
+                            if (cell) {
+                                const rect = cell.getBoundingClientRect();
+                                const boardRect = board.getBoundingClientRect();
+                                pawn.element.style.left = `${rect.left - boardRect.left + (rect.width / 2) - (pawn.element.offsetWidth / 2)}px`;
+                                pawn.element.style.top = `${rect.top - boardRect.top + (rect.height / 2) - (pawn.element.offsetHeight / 2)}px`;
+                            }
+                        }
+                    });
+                });
+            }
+
+            function rollDice() {
+                if(isRolling) return;
+                isRolling = true;
+                rollBtn.disabled = true;
+                messageElement.textContent = '';
+                diceValue = Math.floor(Math.random() * 6) + 1;
+                
+                // Random rotations for a "rolling" effect
+                const randomX = (Math.floor(Math.random() * 4) + 4) * 360;
+                const randomY = (Math.floor(Math.random() * 4) + 4) * 360;
+                diceElement.style.transform = `rotateX(${randomX}deg) rotateY(${randomY}deg)`;
+                
+                // Set the final rotation after the roll animation
+                setTimeout(() => {
+                    const finalRotation = {
+                        1: 'rotateY(0deg)', 2: 'rotateX(-90deg)', 3: 'rotateY(90deg)',
+                        4: 'rotateY(-90deg)', 5: 'rotateX(90deg)', 6: 'rotateY(180deg)'
+                    }[diceValue];
+                    diceElement.style.transform = `${finalRotation} translateZ(calc(var(--cell-size)))`;
+                    setTimeout(handlePostRoll, 500);
+                }, 1000);
+            }
+
+            function handlePostRoll() {
+                isRolling = false;
+                const currentPlayerColor = playerOrder[currentPlayerIndex];
+                const movablePawns = getMovablePawns(currentPlayerColor, diceValue);
+
+                if (movablePawns.length === 0) {
+                    messageElement.textContent = `No movable pawns for ${players[currentPlayerColor].name}. Next player's turn.`;
+                    setTimeout(switchTurn, 2000);
+                } else {
+                    messageElement.textContent = 'Select a pawn to move.';
+                    movablePawns.forEach(pawn => pawn.element.classList.add('movable'));
+                    if (movablePawns.length === 1) {
+                        // If only one pawn can be moved, move it automatically
+                        setTimeout(() => handlePawnClick(currentPlayerColor, parseInt(movablePawns[0].id.split('-')[2])), 1000);
+                    }
+                }
+            }
+
+            function getMovablePawns(color, roll) {
+                const playerPawns = pawns[color];
+                const movable = [];
+
+                playerPawns.forEach(pawn => {
+                    if (pawn.state === 'base' && roll === 6) {
+                        movable.push(pawn);
+                    } else if (pawn.state === 'active') {
+                        const newPos = pawn.position + roll;
+                        if (newPos < paths[color].length) {
+                             // Check for valid move without skipping home entry
+                            if (newPos >= startPositions[color] && newPos < paths[color].length - 6) {
+                                // Pawn is entering the home stretch but cannot land exactly on the home base
+                                movable.push(pawn);
+                            } else if (newPos < startPositions[color]){
+                                // Pawn is on the main path
+                                movable.push(pawn);
+                            }
+                        }
+                    }
+                });
+                return movable;
+            }
+            
+            function handlePawnClick(color, index) {
+                const pawn = pawns[color][index];
+                if (color !== playerOrder[currentPlayerIndex] || !pawn.element.classList.contains('movable')) {
+                    return;
+                }
+                
+                document.querySelectorAll('.movable').forEach(el => el.classList.remove('movable'));
+
+                // Move logic
+                if (pawn.state === 'base' && diceValue === 6) {
+                    pawn.state = 'active';
+                    pawn.position = 0;
+                } else if (pawn.state === 'active') {
+                    pawn.position += diceValue;
+                    if (pawn.position >= paths[color].length - 6) {
+                         pawn.state = 'home';
+                    }
+                    
+                    // Check for capture
+                    const [newRow, newCol] = paths[color][pawn.position];
+                    const targetCellId = `${newRow}-${newCol}`;
+                    
+                    if (!safeSpots.includes(targetCellId)) {
+                        playerOrder.forEach(otherColor => {
+                            if (otherColor !== color) {
+                                pawns[otherColor].forEach(otherPawn => {
+                                    if (otherPawn.state === 'active' && otherPawn.position >= 0) {
+                                        const [otherRow, otherCol] = paths[otherColor][otherPawn.position];
+                                        if (otherRow === newRow && otherCol === newCol) {
+                                            // Capture!
+                                            otherPawn.state = 'base';
+                                            otherPawn.position = -1;
+                                        }
+                                    }
+                                });
+                            }
+                        });
+                    }
+                }
+                
+                renderPawns();
+                checkWinCondition();
+
+                if (diceValue !== 6) {
+                    setTimeout(switchTurn, 1000);
+                } else {
+                    rollBtn.disabled = false;
+                    messageElement.textContent = "You got a 6! Roll again.";
+                }
+            }
+            
+            function checkWinCondition() {
+                const currentPlayerColor = playerOrder[currentPlayerIndex];
+                const allHome = pawns[currentPlayerColor].filter(p => p.state === 'home').length === 4;
+                if (allHome) {
+                    winnerText.textContent = `${players[currentPlayerColor].name} wins!`;
+                    winnerText.style.color = players[currentPlayerColor].color;
+                    gameOverlay.classList.remove('hidden');
+                }
+            }
+
+            function switchTurn() {
+                currentPlayerIndex = (currentPlayerIndex + 1) % playerOrder.length;
+                const newPlayerColor = playerOrder[currentPlayerIndex];
+                playerTurnElement.textContent = `${players[newPlayerColor].name}'s Turn`;
+                playerTurnElement.style.backgroundColor = players[newPlayerColor].color;
+                rollBtn.disabled = false;
+                messageElement.textContent = '';
+                diceValue = 0;
+            }
+            
+            function startGame() {
+                gameOverlay.classList.add('hidden');
+                createBoard();
+                initializePawns();
+                currentPlayerIndex = 0;
+                const firstPlayer = playerOrder[0];
+                playerTurnElement.textContent = `${players[firstPlayer].name}'s Turn`;
+                playerTurnElement.style.backgroundColor = players[firstPlayer].color;
+                rollBtn.disabled = false;
+                messageElement.textContent = '';
+                diceElement.style.transform = 'rotateY(0deg) translateZ(calc(var(--cell-size)))'; // Show 1 initially
+                window.addEventListener('resize', renderPawns);
+            }
+
+            rollBtn.addEventListener('click', rollDice);
+            restartBtn.addEventListener('click', startGame);
+
+            startGame();
+        });
+    </script>
+</body>
+</html>
